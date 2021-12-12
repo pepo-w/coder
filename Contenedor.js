@@ -1,47 +1,66 @@
 const fs = require('fs');
 
 class Contenedor {
-    static nextId = 0;
     constructor(fileName) {
-        this.fileName = `./${fileName}`;
+        this.fileName = fileName;
     }
 
-    // save obj on file and return new unique id
     async save(obj) {
+        const all = await this.getAll();
+        const newId = all.length === 0 ? 1 : all[all.length - 1].id + 1;
+        all.push({ ...obj, id: newId });
         try {
-            const newObject = { id: ++Contenedor.nextId, ...obj };
-            const formattedNewObject = JSON.stringify(newObject, null, 2);
-            await fs.promises.appendFile(this.fileName, formattedNewObject);
-            return newObject.id;
+            await fs.promises.writeFile(
+                this.fileName,
+                JSON.stringify(all, null, 2)
+            );
+            return newId;
         } catch (error) {
-            console.error('cant write file: ', error);
+            console.error('Error saving new item', error);
             return null;
         }
     }
 
-    getById(id) {
-        // return object with id from file or null
+    async getById(id) {
+        const all = await this.getAll();
+        return all.find((p) => p.id === id) || null;
     }
 
-    getAll() {
-        // return all objects from file
-        // JSON.parse(myObjStr)
+    async getAll() {
+        try {
+            const all = await fs.promises.readFile(this.fileName, 'utf8');
+            return JSON.parse(all);
+        } catch (error) {
+            return [];
+        }
     }
 
-    deleteById(id) {
-        // delete object with id from file
+    async deleteById(id) {
+        const all = await this.getAll();
+        const index = all.findIndex((p) => p.id === id);
+        if (index > -1) {
+            all.splice(index, 1);
+            try {
+                await fs.promises.writeFile(
+                    this.fileName,
+                    JSON.stringify(all, null, 2)
+                );
+            } catch (error) {
+                console.error('Error deleting item', error);
+            }
+        }
     }
 
-    deleteAll() {
-        // delete all object from file
+    async deleteAll() {
+        try {
+            await fs.promises.writeFile(
+                this.fileName,
+                JSON.stringify([], null, 2)
+            );
+        } catch (error) {
+            console.error('Error deleting all items', error);
+        }
     }
 }
 
-const container = new Contenedor('testFile');
-container
-    .save({
-        title: 'product1',
-        price: 99.99,
-        thumbnail: 'url',
-    })
-    .then((newId) => console.log('new id:', newId));
+module.exports = Contenedor;
